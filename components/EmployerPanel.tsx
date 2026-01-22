@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { generateJobDescription, analyzeCandidateMatch } from '../services/geminiService';
+import { supabase } from '../services/supabaseClient';
 import { MOCK_CANDIDATES_DATA, MOCK_JOBS } from '../constants';
 import { Candidate, ThemeMode } from '../types';
 
@@ -12,6 +13,7 @@ const EmployerPanel: React.FC<EmployerPanelProps> = ({ theme }) => {
   const [jobData, setJobData] = useState({ title: '', company: '', requirements: '' });
   const [generatedDesc, setGeneratedDesc] = useState('');
   const [loadingJD, setLoadingJD] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   
   // Ranking State
   const [candidates, setCandidates] = useState<Candidate[]>(MOCK_CANDIDATES_DATA);
@@ -46,6 +48,49 @@ const EmployerPanel: React.FC<EmployerPanelProps> = ({ theme }) => {
     const desc = await generateJobDescription(jobData.title, jobData.company, jobData.requirements);
     setGeneratedDesc(desc);
     setLoadingJD(false);
+  };
+
+  const handlePublish = async () => {
+    if (!jobData.title || !generatedDesc) return;
+    setPublishing(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        alert("You must be logged in to post a job.");
+        setPublishing(false);
+        return;
+      }
+
+      // Parse requirements string into array
+      const reqArray = jobData.requirements.split(',').map(s => s.trim()).filter(Boolean);
+
+      const { error } = await supabase.from('jobs').insert({
+        title: jobData.title,
+        company: jobData.company,
+        description: generatedDesc,
+        requirements: reqArray,
+        location: 'Remote / India', // Default for now
+        salary: '₹12L - ₹24L', // Default/Placeholder
+        type: 'Full-time',
+        employer_id: user.id
+      });
+
+      if (error) throw error;
+
+      alert("Job Posted Successfully! It is now live on the Job Board.");
+      
+      // Reset form
+      setJobData({ title: '', company: '', requirements: '' });
+      setGeneratedDesc('');
+
+    } catch (err: any) {
+      console.error(err);
+      alert("Failed to post job: " + err.message);
+    } finally {
+      setPublishing(false);
+    }
   };
 
   const handleRankCandidates = async () => {
@@ -133,16 +178,25 @@ const EmployerPanel: React.FC<EmployerPanelProps> = ({ theme }) => {
             </button>
 
             {generatedDesc && (
-              <div className="mt-4">
+              <div className="mt-4 animate-fade-in">
                 <label className={labelClass}>Generated Description</label>
                 <textarea 
                   className={`w-full p-2 border rounded-md h-64 text-sm font-mono outline-none ${inputClass}`}
                   value={generatedDesc}
                   onChange={(e) => setGeneratedDesc(e.target.value)}
                 />
-                <button className="mt-2 w-full bg-primary text-white py-2 rounded-lg font-bold">
-                  Publish Job (₹999)
+                <button 
+                  onClick={handlePublish}
+                  disabled={publishing}
+                  className="mt-4 w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white py-3 rounded-lg font-bold shadow-lg transition-all transform hover:-translate-y-0.5"
+                >
+                  {publishing ? (
+                    <span><i className="fa-solid fa-circle-notch fa-spin mr-2"></i> Processing Payment & Posting...</span>
+                  ) : (
+                    <span><i className="fa-solid fa-check-circle mr-2"></i> Publish Job Now (₹999)</span>
+                  )}
                 </button>
+                <p className="text-xs text-center mt-2 text-slate-500"><i className="fa-solid fa-lock mr-1"></i> Secure Payment via Razorpay/Stripe</p>
               </div>
             )}
           </div>

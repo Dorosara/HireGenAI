@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { generateResumeSummary, optimizeResumeContent } from '../services/geminiService';
+import { supabase } from '../services/supabaseClient';
 import { AIResumeData, ThemeMode } from '../types';
 
 interface ResumeBuilderProps {
@@ -9,6 +10,7 @@ interface ResumeBuilderProps {
 const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ theme }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -45,6 +47,37 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ theme }) => {
       alert("Failed to generate AI insights");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveResume = async () => {
+    if (!aiResult) return;
+    setSaving(true);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert("Please sign in to save your resume.");
+        return;
+      }
+
+      const { error } = await supabase.from('resumes').insert({
+        user_id: user.id,
+        title: `${formData.targetRole} Resume`,
+        summary: aiResult.summary,
+        skills: aiResult.skills,
+        raw_text: formData.experience // Saving raw input for future reference
+      });
+
+      if (error) throw error;
+      
+      alert("Resume Saved Successfully to your Profile!");
+      
+    } catch (err: any) {
+      console.error(err);
+      alert("Error saving resume: " + err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -153,16 +186,23 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ theme }) => {
                 </ul>
               </div>
 
-              <div className="flex gap-4 pt-4">
+              <div className="flex flex-col md:flex-row gap-4 pt-4">
                  <button
                   onClick={() => window.print()}
-                  className={`flex-1 text-white py-2 rounded-lg transition-colors ${isDark ? 'bg-slate-800 hover:bg-slate-700 border border-slate-700' : 'bg-slate-800 hover:bg-slate-900'}`}
+                  className={`flex-1 text-white py-3 rounded-lg transition-colors font-medium shadow-sm ${isDark ? 'bg-slate-800 hover:bg-slate-700 border border-slate-700' : 'bg-slate-800 hover:bg-slate-900'}`}
                 >
                   <i className="fa-solid fa-download mr-2"></i> Download PDF
                 </button>
                 <button
+                  onClick={handleSaveResume}
+                  disabled={saving}
+                  className={`flex-1 text-white py-3 rounded-lg transition-colors font-medium shadow-sm ${saving ? 'bg-primary/50' : 'bg-primary hover:bg-blue-600'}`}
+                >
+                  {saving ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <><i className="fa-solid fa-cloud-arrow-up mr-2"></i> Save to Profile</>}
+                </button>
+                <button
                   onClick={() => setStep(1)}
-                  className={`flex-1 border py-2 rounded-lg transition-colors ${isDark ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}
+                  className={`flex-1 border py-3 rounded-lg transition-colors font-medium ${isDark ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}
                 >
                   Edit Inputs
                 </button>

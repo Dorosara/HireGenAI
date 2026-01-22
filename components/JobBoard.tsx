@@ -7,6 +7,26 @@ interface JobBoardProps {
   theme: ThemeMode;
 }
 
+// Helper for relative time (e.g., "2 days ago")
+const timeAgo = (dateString: string) => {
+  if (!dateString) return 'Just now';
+  const date = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  let interval = seconds / 31536000;
+  if (interval > 1) return Math.floor(interval) + " years ago";
+  interval = seconds / 2592000;
+  if (interval > 1) return Math.floor(interval) + " months ago";
+  interval = seconds / 86400;
+  if (interval > 1) return Math.floor(interval) + " days ago";
+  interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + " hours ago";
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + " minutes ago";
+  return "Just now";
+};
+
 const JobBoard: React.FC<JobBoardProps> = ({ theme }) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,11 +56,11 @@ const JobBoard: React.FC<JobBoardProps> = ({ theme }) => {
             title: item.title,
             company: item.company,
             location: item.location,
-            salary: item.salary,
-            type: item.type,
+            salary: item.salary || 'Not disclosed',
+            type: item.type || 'Full-time',
             description: item.description,
-            // Format date relative or simplified
-            postedAt: new Date(item.posted_at).toLocaleDateString(), 
+            // Format date relative
+            postedAt: timeAgo(item.posted_at), 
             requirements: item.requirements || []
           }));
           setJobs(mappedJobs);
@@ -79,16 +99,55 @@ const JobBoard: React.FC<JobBoardProps> = ({ theme }) => {
 
   const filteredJobs = jobs.filter(job => 
     job.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    job.company.toLowerCase().includes(searchTerm.toLowerCase())
+    job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    job.requirements?.some(r => r.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const handleApply = (id: string) => {
+  const handleApply = async (id: string) => {
     setApplying(id);
-    // In a real app, this would insert into an 'applications' table
-    setTimeout(() => {
-      alert("Application sent! Our AI Auto-Apply bot has also customized your cover letter.");
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        alert("Please log in to apply.");
+        setApplying(null);
+        return;
+      }
+
+      // Check for existing application
+      const { data: existing } = await supabase
+        .from('applications')
+        .select('id')
+        .eq('job_id', id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (existing) {
+        alert("You have already applied for this position.");
+        setApplying(null);
+        return;
+      }
+
+      // Insert Application
+      const { error } = await supabase.from('applications').insert({
+        job_id: id,
+        user_id: user.id,
+        status: 'Applied',
+        ai_score: Math.floor(Math.random() * 30) + 70, // Simulated AI Score
+        ai_analysis: 'Application received via Quick Apply. Pending recruiter review.'
+      });
+
+      if (error) throw error;
+
+      alert("Application successfully sent! Check your dashboard for status updates.");
+
+    } catch (err: any) {
+      console.error(err);
+      alert("Failed to apply: " + err.message);
+    } finally {
       setApplying(null);
-    }, 1500);
+    }
   };
 
   return (
@@ -119,7 +178,7 @@ const JobBoard: React.FC<JobBoardProps> = ({ theme }) => {
                 <div>
                   <h3 className={`text-xl font-bold ${textTitle}`}>{job.title}</h3>
                   <p className={`${textMuted} font-medium mb-2`}>{job.company} • {job.location}</p>
-                  <div className="flex gap-2 mb-4">
+                  <div className="flex gap-2 mb-3">
                     <span className="bg-blue-500/10 text-blue-600 px-2 py-1 rounded text-xs font-semibold">{job.type}</span>
                     <span className="bg-green-500/10 text-green-600 px-2 py-1 rounded text-xs font-semibold">{job.salary}</span>
                   </div>
@@ -128,6 +187,22 @@ const JobBoard: React.FC<JobBoardProps> = ({ theme }) => {
               </div>
               
               <p className={`${isDark ? 'text-slate-300' : 'text-slate-600'} mb-4 line-clamp-2`}>{job.description}</p>
+              
+              {/* Requirements Tags */}
+              {job.requirements && job.requirements.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {job.requirements.slice(0, 4).map((req, idx) => (
+                    <span key={idx} className={`text-xs px-2 py-1 rounded border ${isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+                      {req}
+                    </span>
+                  ))}
+                  {job.requirements.length > 4 && (
+                    <span className={`text-xs px-2 py-1 rounded border ${isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+                      +{job.requirements.length - 4} more
+                    </span>
+                  )}
+                </div>
+              )}
               
               <div className={`flex justify-between items-center border-t pt-4 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
                 <span className={`text-xs ${textMuted}`}>Posted: {job.postedAt}</span>

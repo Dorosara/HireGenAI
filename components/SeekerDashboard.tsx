@@ -3,6 +3,7 @@ import { UserProfile, ThemeMode } from '../types';
 import JobBoard from './JobBoard';
 import ResumeBuilder from './ResumeBuilder';
 import ApplicationHistory from './ApplicationHistory';
+import SubscriptionPanel from './SubscriptionPanel';
 
 interface SeekerDashboardProps {
   userProfile: UserProfile;
@@ -10,7 +11,7 @@ interface SeekerDashboardProps {
 }
 
 const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ userProfile, theme }) => {
-  const [activeTab, setActiveTab] = useState<'jobs' | 'applications'>('jobs');
+  const [activeTab, setActiveTab] = useState<'jobs' | 'applications' | 'membership'>('jobs');
 
   const isDark = theme === 'dark';
   const isGradient = theme === 'gradient';
@@ -69,27 +70,31 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ userProfile, theme })
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-8">
           <div className={`rounded-xl shadow-sm border overflow-hidden ${cardClass}`}>
-            <div className={`flex border-b ${isDark ? 'border-slate-800' : isGradient ? 'border-white/30' : 'border-slate-200'}`}>
+            <div className={`flex border-b overflow-x-auto ${isDark ? 'border-slate-800' : isGradient ? 'border-white/30' : 'border-slate-200'}`}>
               <button 
                 onClick={() => setActiveTab('jobs')}
-                className={`flex-1 py-4 text-center font-bold transition-all ${activeTab === 'jobs' ? 'text-primary border-b-2 border-primary' : `${textMuted} hover:text-slate-600`}`}
+                className={`flex-1 min-w-[100px] py-4 text-center font-bold transition-all ${activeTab === 'jobs' ? 'text-primary border-b-2 border-primary' : `${textMuted} hover:text-slate-600`}`}
               >
                 Find Jobs
               </button>
               <button 
                 onClick={() => setActiveTab('applications')}
-                className={`flex-1 py-4 text-center font-bold transition-all ${activeTab === 'applications' ? 'text-primary border-b-2 border-primary' : `${textMuted} hover:text-slate-600`}`}
+                className={`flex-1 min-w-[140px] py-4 text-center font-bold transition-all ${activeTab === 'applications' ? 'text-primary border-b-2 border-primary' : `${textMuted} hover:text-slate-600`}`}
               >
                 My Applications
+              </button>
+              <button 
+                onClick={() => setActiveTab('membership')}
+                className={`flex-1 min-w-[100px] py-4 text-center font-bold transition-all ${activeTab === 'membership' ? 'text-primary border-b-2 border-primary' : `${textMuted} hover:text-slate-600`}`}
+              >
+                Membership
               </button>
             </div>
             
             <div className={`p-6 ${isDark ? 'bg-slate-950/50' : isGradient ? 'bg-transparent' : 'bg-slate-50'}`}>
-              {activeTab === 'jobs' ? (
-                <JobBoard theme={theme} />
-              ) : (
-                <ApplicationHistory theme={theme} userProfile={userProfile} />
-              )}
+              {activeTab === 'jobs' && <JobBoard theme={theme} />}
+              {activeTab === 'applications' && <ApplicationHistory theme={theme} userProfile={userProfile} />}
+              {activeTab === 'membership' && <SubscriptionPanel theme={theme} userProfile={userProfile} />}
             </div>
           </div>
           

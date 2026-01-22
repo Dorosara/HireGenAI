@@ -51,8 +51,8 @@ CREATE TABLE public.applications (
   job_id UUID REFERENCES public.jobs(id) ON DELETE CASCADE,
   user_id UUID REFERENCES public.user_profiles(id) ON DELETE CASCADE,
   status TEXT DEFAULT 'Applied', -- 'Applied', 'Screening', 'Interview', 'Rejected', 'Offer'
-  ai_score INTEGER DEFAULT 0,
-  ai_analysis TEXT, -- JSON string or text summary
+  ai_score INTEGER DEFAULT 0, -- AI calculated match score (0-100)
+  ai_analysis TEXT, -- JSON string or text summary of AI analysis
   applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -83,19 +83,40 @@ ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public read access" ON public.user_profiles FOR SELECT USING (true);
 CREATE POLICY "Users can update own profile" ON public.user_profiles FOR UPDATE USING (auth.uid() = id);
 
--- Jobs: Everyone can read, Authenticated employers can insert
+-- Jobs: Everyone can read, Authenticated employers can insert/update their own
 CREATE POLICY "Read jobs" ON public.jobs FOR SELECT USING (true);
 CREATE POLICY "Insert jobs" ON public.jobs FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Employers update own jobs" ON public.jobs FOR UPDATE USING (auth.uid() = employer_id);
+CREATE POLICY "Employers delete own jobs" ON public.jobs FOR DELETE USING (auth.uid() = employer_id);
 
 -- Resumes: Users can CRUD their own resumes
 CREATE POLICY "Users manage own resumes" ON public.resumes USING (auth.uid() = user_id);
 
--- Applications: 
--- 1. Users can see their own applications
-CREATE POLICY "Users see own applications" ON public.applications FOR SELECT USING (auth.uid() = user_id);
--- 2. Users can create applications
-CREATE POLICY "Users can apply" ON public.applications FOR INSERT WITH CHECK (auth.uid() = user_id);
--- 3. Employers can see applications for their jobs (Advanced policy omitted for simplicity, basic insert allowed)
+-- Applications Policies:
+
+-- 1. Job Seekers can view their own applications
+CREATE POLICY "Seekers view own applications" ON public.applications FOR SELECT USING (auth.uid() = user_id);
+
+-- 2. Job Seekers can create applications (apply)
+CREATE POLICY "Seekers apply" ON public.applications FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- 3. Employers can view applications for jobs they own
+CREATE POLICY "Employers view job applications" ON public.applications FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM public.jobs 
+    WHERE jobs.id = applications.job_id 
+    AND jobs.employer_id = auth.uid()
+  )
+);
+
+-- 4. Employers can update applications (change status, add AI score) for jobs they own
+CREATE POLICY "Employers update job applications" ON public.applications FOR UPDATE USING (
+  EXISTS (
+    SELECT 1 FROM public.jobs 
+    WHERE jobs.id = applications.job_id 
+    AND jobs.employer_id = auth.uid()
+  )
+);
 
 -- Subscriptions: Users view their own
 CREATE POLICY "Users view own sub" ON public.subscriptions FOR SELECT USING (auth.uid() = user_id);
@@ -110,6 +131,3 @@ VALUES
 ('Senior React Engineer', 'TechFlow Solutions', 'Bangalore, India (Remote)', '₹25L - ₹35L', 'Full-time', 'We are looking for an experienced React developer to lead our frontend team.', ARRAY['React 18+', 'TypeScript', 'Tailwind CSS']),
 ('AI Product Manager', 'FutureScale AI', 'Gurugram, India', '₹18L - ₹28L', 'Full-time', 'Drive the product vision for our generative AI SaaS platform.', ARRAY['Product Management', 'LLM Knowledge', 'Agile']),
 ('Growth Hacker', 'StartupX', 'Mumbai, India', '₹12L - ₹20L', 'Contract', 'Looking for a marketing wizard to scale our user base.', ARRAY['SEO', 'Paid Ads', 'Content Marketing']);
-
--- Note: User Profiles, Applications, and Resumes usually depend on real Auth UIDs. 
--- Since we don't have real users yet, we won't seed them to avoid Foreign Key violations.

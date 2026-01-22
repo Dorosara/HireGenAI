@@ -3,8 +3,7 @@ import { supabase } from './services/supabaseClient';
 import { authService } from './services/authService';
 import { UserRole, ThemeMode, UserProfile } from './types';
 import { PRICING_PLANS } from './constants';
-import JobBoard from './components/JobBoard';
-import ResumeBuilder from './components/ResumeBuilder';
+import SeekerDashboard from './components/SeekerDashboard';
 import EmployerPanel from './components/EmployerPanel';
 import AdminPanel from './components/AdminPanel';
 
@@ -262,138 +261,6 @@ const App: React.FC = () => {
     </div>
   );
 
-  const SeekerDashboard = () => {
-    const [activeTab, setActiveTab] = useState<'jobs' | 'applications'>('jobs');
-    const [applications, setApplications] = useState<any[]>([]);
-    const [loadingApps, setLoadingApps] = useState(false);
-
-    // Fetch applications when tab is active
-    useEffect(() => {
-      if (activeTab === 'applications' && userProfile) {
-        const fetchApps = async () => {
-          setLoadingApps(true);
-          const { data, error } = await supabase
-            .from('applications')
-            .select(`
-              id,
-              status,
-              applied_at,
-              jobs (
-                title,
-                company,
-                location,
-                type
-              )
-            `)
-            .eq('user_id', userProfile.id)
-            .order('applied_at', { ascending: false });
-
-          if (!error && data) {
-            setApplications(data);
-          }
-          setLoadingApps(false);
-        };
-        fetchApps();
-      }
-    }, [activeTab]);
-
-    const getStatusColor = (status: string) => {
-      switch (status) {
-        case 'Applied': return 'text-blue-500 bg-blue-500/10 border-blue-500/20';
-        case 'Screening': return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
-        case 'Interview': return 'text-purple-500 bg-purple-500/10 border-purple-500/20';
-        case 'Offer': return 'text-green-500 bg-green-500/10 border-green-500/20';
-        case 'Rejected': return 'text-red-500 bg-red-500/10 border-red-500/20';
-        default: return 'text-slate-500 bg-slate-500/10 border-slate-500/20';
-      }
-    };
-
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="space-y-6">
-            <div className={`p-6 rounded-xl border shadow-sm ${cardClass}`}>
-              <div className="text-center mb-4">
-                <img src={userProfile?.avatar_url} className="w-20 h-20 rounded-full mx-auto mb-2 border-2 border-primary object-cover" alt="Profile" />
-                <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-slate-900'}`}>{userProfile?.full_name}</h3>
-                <p className={`${textMuted} text-sm`}>{userProfile?.email}</p>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className={textMuted}>Profile Strength</span>
-                  <span className="text-green-500 font-bold">15%</span>
-                </div>
-                <div className={`w-full rounded-full h-2 ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                  <div className="bg-green-500 h-2 rounded-full w-[15%]"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="lg:col-span-2 space-y-8">
-            <div className={`rounded-xl shadow-sm border overflow-hidden ${cardClass}`}>
-              <div className={`flex border-b ${isDark ? 'border-slate-800' : isGradient ? 'border-white/30' : 'border-slate-200'}`}>
-                <button 
-                  onClick={() => setActiveTab('jobs')}
-                  className={`flex-1 py-4 text-center font-bold transition-all ${activeTab === 'jobs' ? 'text-primary border-b-2 border-primary' : `${textMuted} hover:text-slate-600`}`}
-                >
-                  Find Jobs
-                </button>
-                <button 
-                  onClick={() => setActiveTab('applications')}
-                  className={`flex-1 py-4 text-center font-bold transition-all ${activeTab === 'applications' ? 'text-primary border-b-2 border-primary' : `${textMuted} hover:text-slate-600`}`}
-                >
-                  My Applications
-                </button>
-              </div>
-              
-              <div className={`p-6 ${isDark ? 'bg-slate-950/50' : isGradient ? 'bg-transparent' : 'bg-slate-50'}`}>
-                {activeTab === 'jobs' ? (
-                  <JobBoard theme={theme} />
-                ) : (
-                  <div className="space-y-4">
-                    {loadingApps ? (
-                      <div className="text-center py-12">
-                        <i className="fa-solid fa-circle-notch fa-spin text-2xl text-primary"></i>
-                      </div>
-                    ) : applications.length > 0 ? (
-                      applications.map((app) => (
-                        <div key={app.id} className={`p-4 rounded-xl border flex flex-col md:flex-row justify-between md:items-center gap-4 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
-                          <div>
-                            <h4 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-slate-900'}`}>{app.jobs?.title}</h4>
-                            <p className={`text-sm ${textMuted}`}>{app.jobs?.company} • {app.jobs?.location}</p>
-                            <p className={`text-xs ${textMuted} mt-1`}>Applied on: {new Date(app.applied_at).toLocaleDateString()}</p>
-                          </div>
-                          <div className={`px-4 py-2 rounded-full border text-sm font-bold flex items-center justify-center ${getStatusColor(app.status)}`}>
-                            {app.status === 'Applied' && <i className="fa-solid fa-paper-plane mr-2"></i>}
-                            {app.status === 'Screening' && <i className="fa-solid fa-magnifying-glass mr-2"></i>}
-                            {app.status === 'Interview' && <i className="fa-solid fa-video mr-2"></i>}
-                            {app.status === 'Offer' && <i className="fa-solid fa-trophy mr-2"></i>}
-                            {app.status === 'Rejected' && <i className="fa-solid fa-circle-xmark mr-2"></i>}
-                            {app.status}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className={`text-center py-12 ${textMuted}`}>
-                        <i className="fa-solid fa-clipboard-list text-4xl mb-4 opacity-50"></i>
-                        <p>You haven't applied to any jobs yet.</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <div className={`rounded-xl shadow-sm border p-6 ${cardClass}`}>
-              <ResumeBuilder theme={theme} />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
   }
@@ -407,7 +274,7 @@ const App: React.FC = () => {
       {currentView === 'LANDING' && <LandingPage />}
       {currentView === 'AUTH' && <AuthPage />}
       {currentView === 'DASHBOARD' && userProfile && (
-        userProfile.role === UserRole.SEEKER ? <SeekerDashboard /> : 
+        userProfile.role === UserRole.SEEKER ? <SeekerDashboard userProfile={userProfile} theme={theme} /> : 
         userProfile.role === UserRole.EMPLOYER ? (
           <div className="max-w-7xl mx-auto px-4 py-8">
             <EmployerPanel theme={theme} />

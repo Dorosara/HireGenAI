@@ -4,6 +4,7 @@ import { PRICING_PLANS } from './constants';
 import JobBoard from './components/JobBoard';
 import ResumeBuilder from './components/ResumeBuilder';
 import EmployerPanel from './components/EmployerPanel';
+import AdminPanel from './components/AdminPanel';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'LANDING' | 'DASHBOARD' | 'AUTH'>('LANDING');
@@ -126,11 +127,11 @@ const App: React.FC = () => {
             ) : (
               <div className="flex items-center gap-4">
                 <span className={`text-sm ${textMuted} hidden md:block`}>
-                  Welcome, {userRole === UserRole.SEEKER ? 'Job Seeker' : 'Recruiter'}
+                  {userRole === UserRole.SEEKER ? 'Job Seeker' : userRole === UserRole.EMPLOYER ? 'Recruiter' : 'Admin'}
                 </span>
                 <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-primary to-secondary p-[2px]">
                    <div className={`h-full w-full rounded-full flex items-center justify-center ${isDark ? 'bg-slate-900' : 'bg-white'}`}>
-                     <i className={`fa-solid fa-user ${isDark ? 'text-slate-300' : 'text-slate-600'} text-xs`}></i>
+                     <i className={`fa-solid ${userRole === UserRole.ADMIN ? 'fa-shield-halved text-red-500' : 'fa-user text-slate-500'} text-xs`}></i>
                    </div>
                 </div>
                 <button 
@@ -272,6 +273,19 @@ const App: React.FC = () => {
               <div className={`text-xs ${textMuted}`}>Hiring top talent</div>
             </div>
           </button>
+
+          <button 
+            onClick={() => handleLogin(UserRole.ADMIN)}
+            className={`w-full p-4 border rounded-xl flex items-center transition-all group ${isDark ? 'border-slate-800 hover:bg-slate-800' : 'border-slate-200 hover:bg-red-50 hover:border-red-500'}`}
+          >
+            <div className={`p-3 rounded-lg mr-4 ${isDark ? 'bg-slate-800' : 'bg-red-100'}`}>
+              <i className="fa-solid fa-shield-halved text-red-600"></i>
+            </div>
+            <div className="text-left">
+              <div className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Admin Login</div>
+              <div className={`text-xs ${textMuted}`}>Manage Platform</div>
+            </div>
+          </button>
         </div>
         
         <div className={`mt-6 text-center text-sm ${textMuted}`}>
@@ -349,9 +363,15 @@ const App: React.FC = () => {
       {currentView === 'AUTH' && <AuthPage />}
       {currentView === 'DASHBOARD' && (
         userRole === UserRole.SEEKER ? <SeekerDashboard /> : 
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <EmployerPanel theme={theme} />
-        </div>
+        userRole === UserRole.EMPLOYER ? (
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <EmployerPanel theme={theme} />
+          </div>
+        ) : (
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <AdminPanel theme={theme} />
+          </div>
+        )
       )}
     </div>
   );

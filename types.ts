@@ -2,17 +2,18 @@ export enum UserRole {
   GUEST = 'GUEST',
   SEEKER = 'SEEKER',
   EMPLOYER = 'EMPLOYER',
-  COLLEGE = 'COLLEGE'
+  COLLEGE = 'COLLEGE',
+  ADMIN = 'ADMIN'
 }
 
 export type ThemeMode = 'light' | 'dark' | 'gradient';
 
-export interface User {
-  id: string;
-  name: string;
+export interface UserProfile {
+  id: string; // UUID from auth.users
   email: string;
+  full_name: string;
   role: UserRole;
-  avatar?: string;
+  avatar_url?: string;
 }
 
 export interface Job {
@@ -23,18 +24,37 @@ export interface Job {
   salary: string;
   type: 'Full-time' | 'Part-time' | 'Contract' | 'Remote';
   description: string;
-  postedAt: string;
+  postedAt: string; // Mapped from posted_at
   requirements: string[];
+  employer_id?: string;
 }
 
 export interface Application {
   id: string;
-  jobId: string;
-  userId: string;
+  job_id: string;
+  user_id: string;
   status: 'Applied' | 'Screening' | 'Interview' | 'Rejected' | 'Offer';
-  aiScore: number;
-  resumeUrl?: string;
-  appliedAt: string;
+  ai_score: number;
+  ai_analysis?: string;
+  applied_at: string;
+}
+
+export interface Resume {
+  id: string;
+  user_id: string;
+  title: string;
+  summary: string;
+  skills: string[];
+  raw_text?: string;
+  created_at: string;
+}
+
+export interface Subscription {
+  id: string;
+  user_id: string;
+  plan_id: string;
+  status: 'active' | 'cancelled' | 'expired';
+  end_date?: string;
 }
 
 export interface PricingPlan {

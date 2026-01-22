@@ -85,7 +85,6 @@ export const generateJobDescription = async (title: string, company: string, key
 
 export const analyzeCandidateMatch = async (resumeText: string, jobDescription: string): Promise<CandidateAnalysis> => {
   if (!apiKey) {
-     // Mock fallback if no API key
      return {
        score: Math.floor(Math.random() * 40) + 50,
        reasoning: "API Key missing. Simulated Score.",
@@ -98,15 +97,12 @@ export const analyzeCandidateMatch = async (resumeText: string, jobDescription: 
       model: 'gemini-3-flash-preview',
       contents: `
         You are an expert ATS (Applicant Tracking System) and Technical Recruiter.
-        
         Job Description: "${jobDescription.substring(0, 1000)}..."
-        
         Candidate Resume: "${resumeText.substring(0, 1000)}..."
-        
         Analyze the match. 
-        1. Assign a score from 0-100 based on keyword matching, experience, and relevance.
-        2. Provide a 1-sentence reasoning for the score.
-        3. List up to 3 critical keywords missing from the resume found in the JD.
+        1. Assign a score from 0-100.
+        2. Provide a 1-sentence reasoning.
+        3. List up to 3 missing keywords.
       `,
       config: {
         responseMimeType: "application/json",
@@ -129,5 +125,56 @@ export const analyzeCandidateMatch = async (resumeText: string, jobDescription: 
       reasoning: "AI analysis failed.",
       missingKeywords: []
     };
+  }
+};
+
+/**
+ * Simulates a scraper by generating realistic job data based on a platform and keyword.
+ */
+export const simulateJobScraping = async (platform: string, keyword: string, count: number = 3) => {
+  if (!apiKey) throw new Error("API Key missing");
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `
+        Act as a Web Scraper Agent.
+        Generate ${count} highly realistic job postings that would currently be found on "${platform}" for the role "${keyword}" in India.
+        Make the companies diverse (mix of MNCs and Startups).
+        
+        Return a JSON Array of objects with these exact fields:
+        - title: Job Title
+        - company: Company Name
+        - location: City, India
+        - salary: Realistic range (e.g., ₹12L - ₹18L)
+        - type: 'Full-time' or 'Contract' or 'Remote'
+        - description: A short 2-sentence summary.
+        - requirements: Array of 4-5 key skills.
+      `,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              company: { type: Type.STRING },
+              location: { type: Type.STRING },
+              salary: { type: Type.STRING },
+              type: { type: Type.STRING },
+              description: { type: Type.STRING },
+              requirements: { type: Type.ARRAY, items: { type: Type.STRING } }
+            }
+          }
+        }
+      }
+    });
+
+    const text = getText(response);
+    return JSON.parse(text);
+  } catch (error) {
+    console.error("Scraper Simulation Error:", error);
+    throw error;
   }
 };

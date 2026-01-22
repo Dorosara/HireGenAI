@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../services/supabaseClient'; // Import Supabase Client
 import { MOCK_JOBS } from '../constants';
 import { Job, ThemeMode } from '../types';
 
@@ -7,14 +8,60 @@ interface JobBoardProps {
 }
 
 const JobBoard: React.FC<JobBoardProps> = ({ theme }) => {
-  const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [applying, setApplying] = useState<string | null>(null);
 
   const isDark = theme === 'dark';
   const isGradient = theme === 'gradient';
 
-  // Dynamic Styles - Dark mode uses Slate 900 for cards to pop against 950 backgrounds
+  // Fetch Jobs from Supabase
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        setLoading(true);
+        // Query Supabase 'jobs' table
+        const { data, error } = await supabase
+          .from('jobs')
+          .select('*')
+          .order('posted_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          // Map Supabase data to our Job interface
+          const mappedJobs: Job[] = data.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            company: item.company,
+            location: item.location,
+            salary: item.salary,
+            type: item.type,
+            description: item.description,
+            // Format date relative or simplified
+            postedAt: new Date(item.posted_at).toLocaleDateString(), 
+            requirements: item.requirements || []
+          }));
+          setJobs(mappedJobs);
+        } else {
+          // Fallback to MOCK_JOBS if DB is empty so the UI doesn't look broken during demo
+          console.log('No jobs found in DB, using mock data.');
+          setJobs(MOCK_JOBS);
+        }
+      } catch (err) {
+        console.error('Error fetching jobs:', err);
+        // Fallback on error
+        setJobs(MOCK_JOBS);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchJobs();
+  }, []);
+
+  // Dynamic Styles
   const cardClass = isDark 
     ? 'bg-slate-900 border-slate-800 text-slate-200 hover:border-slate-700 shadow-md' 
     : isGradient 
@@ -37,6 +84,7 @@ const JobBoard: React.FC<JobBoardProps> = ({ theme }) => {
 
   const handleApply = (id: string) => {
     setApplying(id);
+    // In a real app, this would insert into an 'applications' table
     setTimeout(() => {
       alert("Application sent! Our AI Auto-Apply bot has also customized your cover letter.");
       setApplying(null);
@@ -58,47 +106,54 @@ const JobBoard: React.FC<JobBoardProps> = ({ theme }) => {
         </div>
       </div>
 
-      <div className="grid gap-6">
-        {filteredJobs.map(job => (
-          <div key={job.id} className={`p-6 rounded-xl border shadow-sm hover:shadow-md transition-all ${cardClass}`}>
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className={`text-xl font-bold ${textTitle}`}>{job.title}</h3>
-                <p className={`${textMuted} font-medium mb-2`}>{job.company} • {job.location}</p>
-                <div className="flex gap-2 mb-4">
-                  <span className="bg-blue-500/10 text-blue-600 px-2 py-1 rounded text-xs font-semibold">{job.type}</span>
-                  <span className="bg-green-500/10 text-green-600 px-2 py-1 rounded text-xs font-semibold">{job.salary}</span>
+      {loading ? (
+        <div className={`text-center py-12 ${textMuted}`}>
+          <i className="fa-solid fa-circle-notch fa-spin text-3xl mb-4"></i>
+          <p>Connecting to Live Database...</p>
+        </div>
+      ) : (
+        <div className="grid gap-6">
+          {filteredJobs.map(job => (
+            <div key={job.id} className={`p-6 rounded-xl border shadow-sm hover:shadow-md transition-all ${cardClass}`}>
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className={`text-xl font-bold ${textTitle}`}>{job.title}</h3>
+                  <p className={`${textMuted} font-medium mb-2`}>{job.company} • {job.location}</p>
+                  <div className="flex gap-2 mb-4">
+                    <span className="bg-blue-500/10 text-blue-600 px-2 py-1 rounded text-xs font-semibold">{job.type}</span>
+                    <span className="bg-green-500/10 text-green-600 px-2 py-1 rounded text-xs font-semibold">{job.salary}</span>
+                  </div>
                 </div>
+                <img src={`https://picsum.photos/seed/${job.id}/50/50`} alt="logo" className="rounded-lg opacity-90" />
               </div>
-              <img src={`https://picsum.photos/seed/${job.id}/50/50`} alt="logo" className="rounded-lg opacity-90" />
+              
+              <p className={`${isDark ? 'text-slate-300' : 'text-slate-600'} mb-4 line-clamp-2`}>{job.description}</p>
+              
+              <div className={`flex justify-between items-center border-t pt-4 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+                <span className={`text-xs ${textMuted}`}>Posted: {job.postedAt}</span>
+                <button 
+                  onClick={() => handleApply(job.id)}
+                  disabled={!!applying}
+                  className="bg-primary hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-70 shadow-lg shadow-blue-500/20"
+                >
+                  {applying === job.id ? (
+                    <span><i className="fa-solid fa-paper-plane fa-fade mr-2"></i> Sending...</span>
+                  ) : (
+                    'Quick Apply'
+                  )}
+                </button>
+              </div>
             </div>
-            
-            <p className={`${isDark ? 'text-slate-300' : 'text-slate-600'} mb-4 line-clamp-2`}>{job.description}</p>
-            
-            <div className={`flex justify-between items-center border-t pt-4 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-              <span className={`text-xs ${textMuted}`}>Posted {job.postedAt}</span>
-              <button 
-                onClick={() => handleApply(job.id)}
-                disabled={!!applying}
-                className="bg-primary hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-70 shadow-lg shadow-blue-500/20"
-              >
-                {applying === job.id ? (
-                  <span><i className="fa-solid fa-paper-plane fa-fade mr-2"></i> Sending...</span>
-                ) : (
-                  'Quick Apply'
-                )}
-              </button>
-            </div>
-          </div>
-        ))}
+          ))}
 
-        {filteredJobs.length === 0 && (
-          <div className={`text-center py-12 ${textMuted}`}>
-            <i className="fa-regular fa-folder-open text-4xl mb-4"></i>
-            <p>No jobs found matching your criteria.</p>
-          </div>
-        )}
-      </div>
+          {filteredJobs.length === 0 && (
+            <div className={`text-center py-12 ${textMuted}`}>
+              <i className="fa-regular fa-folder-open text-4xl mb-4"></i>
+              <p>No jobs found matching your criteria.</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
